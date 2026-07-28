@@ -22,43 +22,11 @@ permissions:
 jobs:
 
   #########################################################
-  # 1. Setup & Environment Stage
-  #########################################################
-  setup:
-    name: "1. Setup & Environment"
-    runs-on: Agent-1
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      # Kept for future flexibility (e.g., unit testing with Maven)
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 21
-          cache: maven
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: ./task-management-system-frontend/package-lock.json
-
-      - name: Verify Host Environment
-        run: |
-          docker --version
-          java -version
-          node --version
-
-  #########################################################
-  # 2. Secret Scanning (Gitleaks)
+  # 1. Secret Scanning (Gitleaks)
   #########################################################
   gitleaks:
-    name: "2. Gitleaks Secret Scan"
+    name: "1. Gitleaks Secret Scan"
     runs-on: Agent-1
-    needs: setup
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -66,36 +34,53 @@ jobs:
           fetch-depth: 0
 
       - name: Gitleaks Scan
-        uses: gitleaks/gitleaks-action@v2
-        with:
-          exit-code: 0
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   #########################################################
-  # 3. Code Quality & SAST (SonarQube)
+  # 2. Code Quality & Deep SAST Analysis (SonarQube)
   #########################################################
   sonarqube:
-    name: "3. SonarQube SAST Scan"
+    name: "2. SonarQube SAST Scan"
     runs-on: Agent-1
-    needs: setup
+    needs: gitleaks
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for SonarQube git-blame analysis
 
+      # Set up Java 21 inside this job's isolated environment
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: 'backend/pom.xml'
+
+      # Compile Spring Boot backend code to generate bytecode in target/classes
+      - name: Compile Backend Bytecode
+        run: |
+          cd backend
+          chmod +x mvnw
+          ./mvnw compile -DskipTests
+
+      # Perform Deep Analysis with SonarQube Scan Action v6
       - name: SonarQube Scan
-        uses: SonarSource/sonarqube-scan-action@v5
+        uses: SonarSource/sonarqube-scan-action@v6
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   # #########################################################
-  # # 4. Filesystem Security Scan (Trivy)
+  # # 3. Filesystem Security Scan (Trivy)
   # #########################################################
   # trivy-fs:
-  #   name: "4. Trivy Filesystem Scan"
+  #   name: "3. Trivy Filesystem Scan"
   #   runs-on: Agent-1
-  #   needs: setup
+  #   needs: sonarqube
   #   steps:
   #     - name: Checkout Repository
   #       uses: actions/checkout@v4
@@ -112,10 +97,10 @@ jobs:
   #         output: 'reports/trivy-fs-report.txt'
 
   # #########################################################
-  # # 5. Software Composition Analysis (OWASP Dependency-Check)
+  # # 4. Software Composition Analysis (OWASP Dependency-Check)
   # #########################################################
   # owasp-dependency-check:
-  #   name: "5. OWASP Dependency-Check"
+  #   name: "4. OWASP Dependency-Check"
   #   runs-on: Agent-1
   #   needs: [gitleaks, sonarqube, trivy-fs]
   #   steps:
@@ -134,10 +119,10 @@ jobs:
   #         out: 'reports'
 
   # #########################################################
-  # # 6. Build Docker Images & Generate SBOM (Syft)
+  # # 5. Build Docker Images & Generate SBOM (Syft)
   # #########################################################
   # build-and-sbom:
-  #   name: "6. Build Image & Generate SBOM"
+  #   name: "5. Build Image & Generate SBOM"
   #   runs-on: Agent-1
   #   needs: owasp-dependency-check
   #   steps:
@@ -163,10 +148,10 @@ jobs:
   #         path: reports/sbom.json
 
   # #########################################################
-  # # 7. Container Security Scan & Docker Hub Push
+  # # 6. Container Security Scan & Docker Hub Push
   # #########################################################
   # container-security-and-push:
-  #   name: "7. Trivy Image Scan & Registry Push"
+  #   name: "6. Trivy Image Scan & Registry Push"
   #   runs-on: Agent-1
   #   needs: build-and-sbom
   #   steps:
@@ -188,18 +173,13 @@ jobs:
   #         docker push my-dockerhub-user/backend-app:${{ github.sha }}
 
   # #########################################################
-  # # 8. Trigger GitOps Deployment (ArgoCD)
+  # # 7. Trigger GitOps Deployment (ArgoCD)
   # #########################################################
   # update-gitops:
-  #   name: "8. Update GitOps Repository"
+  #   name: "7. Update GitOps Repository"
   #   runs-on: Agent-1
   #   needs: container-security-and-push
   #   steps:
   #     - name: Checkout GitOps Repository / Update Manifests
   #       run: |
   #         echo "Updating Kubernetes deployment manifest with image tag: ${{ github.sha }}"
-  #         # Add git commit/push logic for your Kubernetes manifests repository here
-
-
-
-         
