@@ -52,38 +52,42 @@ jobs:
           java -version
           node --version
 
-  # #########################################################
-  # # 2. Secret Scanning (Gitleaks)
-  # #########################################################
-  # gitleaks:
-  #   name: "2. Gitleaks Secret Scan"
-  #   runs-on: Agent-1
-  #   needs: setup
-  #   steps:
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@v4
+  #########################################################
+  # 2. Secret Scanning (Gitleaks)
+  #########################################################
+  gitleaks:
+    name: "2. Gitleaks Secret Scan"
+    runs-on: Agent-1
+    needs: setup
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  #     - name: Gitleaks Scan
-  #       uses: gitleaks/gitleaks-action@v2
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Gitleaks Scan
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          exit-code: 0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # #########################################################
-  # # 3. Code Quality & SAST (SonarQube)
-  # #########################################################
-  # sonarqube:
-  #   name: "3. SonarQube SAST Scan"
-  #   runs-on: Agent-1
-  #   needs: setup
-  #   steps:
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@v4
+  #########################################################
+  # 3. Code Quality & SAST (SonarQube)
+  #########################################################
+  sonarqube:
+    name: "3. SonarQube SAST Scan"
+    runs-on: Agent-1
+    needs: setup
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-  #     - name: SonarQube Scan
-  #       uses: SonarSource/sonarqube-scan-action@v5
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   # #########################################################
   # # 4. Filesystem Security Scan (Trivy)
