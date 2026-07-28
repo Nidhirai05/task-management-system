@@ -67,7 +67,6 @@ jobs:
         docker --version
         java --version
         node --version
-        mvn --version
 
   #########################################################
     # Gitleaks check
