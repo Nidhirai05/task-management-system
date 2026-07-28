@@ -6,87 +6,195 @@
 # separate terms of service, privacy policy, and support
 # documentation.
 
+# Production DevSecOps CI/CD Pipeline
+# Sequence: Setup -> Secret Scan / SAST / FS Scan (Parallel) -> SCA -> Build & SBOM -> Image Security -> Push -> GitOps
+
 name: CI pipeline
 
 on:
   push:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
- security:
 
+  #########################################################
+  # 1. Setup & Environment Stage
+  #########################################################
+  setup:
+    name: "1. Setup & Environment"
     runs-on: Agent-1
-
     steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    #########################################################
-    # Checkout Source Code
-    #########################################################
+      # Kept for future flexibility (e.g., unit testing with Maven)
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
 
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ./task-management-system-frontend/package-lock.json
 
-    #########################################################
-    # Setup Java 21
-    #########################################################
+      - name: Verify Host Environment
+        run: |
+          docker --version
+          java -version
+          node --version
 
-    - name: Setup Java
+  # #########################################################
+  # # 2. Secret Scanning (Gitleaks)
+  # #########################################################
+  # gitleaks:
+  #   name: "2. Gitleaks Secret Scan"
+  #   runs-on: Agent-1
+  #   needs: setup
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v4
 
-      uses: actions/setup-java@v4
+  #     - name: Gitleaks Scan
+  #       uses: gitleaks/gitleaks-action@v2
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      with:
+  # #########################################################
+  # # 3. Code Quality & SAST (SonarQube)
+  # #########################################################
+  # sonarqube:
+  #   name: "3. SonarQube SAST Scan"
+  #   runs-on: Agent-1
+  #   needs: setup
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v4
 
-        distribution: temurin
+  #     - name: SonarQube Scan
+  #       uses: SonarSource/sonarqube-scan-action@v5
+  #       env:
+  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-        java-version: 21
+  # #########################################################
+  # # 4. Filesystem Security Scan (Trivy)
+  # #########################################################
+  # trivy-fs:
+  #   name: "4. Trivy Filesystem Scan"
+  #   runs-on: Agent-1
+  #   needs: setup
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v4
 
-        cache: maven
+  #     - name: Create Reports Directory
+  #       run: mkdir -p reports
 
-    #########################################################
-    # Setup Node.js
-    #########################################################
+  #     - name: Trivy FS Scan
+  #       uses: aquasecurity/trivy-action@master
+  #       with:
+  #         scan-type: 'fs'
+  #         scan-ref: '.'
+  #         format: 'table'
+  #         output: 'reports/trivy-fs-report.txt'
 
-    - name: Setup Node
+  # #########################################################
+  # # 5. Software Composition Analysis (OWASP Dependency-Check)
+  # #########################################################
+  # owasp-dependency-check:
+  #   name: "5. OWASP Dependency-Check"
+  #   runs-on: Agent-1
+  #   needs: [gitleaks, sonarqube, trivy-fs]
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v4
 
-      uses: actions/setup-node@v4
+  #     - name: Create Reports Directory
+  #       run: mkdir -p reports
 
-      with:
+  #     - name: OWASP Dependency Check Scan
+  #       uses: dependency-check/Dependency-Check_Action@main
+  #       with:
+  #         project: 'task-management-system'
+  #         path: '.'
+  #         format: 'HTML'
+  #         out: 'reports'
 
-        node-version: 22
+  # #########################################################
+  # # 6. Build Docker Images & Generate SBOM (Syft)
+  # #########################################################
+  # build-and-sbom:
+  #   name: "6. Build Image & Generate SBOM"
+  #   runs-on: Agent-1
+  #   needs: owasp-dependency-check
+  #   steps:
+  #     - name: Checkout Repository
+  #       uses: actions/checkout@v4
 
-        cache: npm
+  #     - name: Build Backend Docker Image
+  #       run: |
+  #         docker build -t my-dockerhub-user/backend-app:${{ github.sha }} ./backend
 
-        cache-dependency-path: ./task-management-system-frontend/package-lock.json
- #########################################################
-    # Verify Environment
-    #########################################################
+  #     - name: Create Reports Directory
+  #       run: mkdir -p reports
 
-    - name: Verify Environment
+  #     - name: Install Syft & Generate SBOM
+  #       run: |
+  #         curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+  #         syft my-dockerhub-user/backend-app:${{ github.sha }} -o spdx-json=reports/sbom.json
 
-      run: |
-        docker --version
-        java --version
-        node --version
+  #     - name: Upload SBOM Report Artifact
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: sbom-report
+  #         path: reports/sbom.json
 
-  #########################################################
-    # Gitleaks check
-    #########################################################
+  # #########################################################
+  # # 7. Container Security Scan & Docker Hub Push
+  # #########################################################
+  # container-security-and-push:
+  #   name: "7. Trivy Image Scan & Registry Push"
+  #   runs-on: Agent-1
+  #   needs: build-and-sbom
+  #   steps:
+  #     - name: Trivy Image Scan
+  #       uses: aquasecurity/trivy-action@master
+  #       with:
+  #         image-ref: 'my-dockerhub-user/backend-app:${{ github.sha }}'
+  #         format: 'table'
+  #         severity: 'CRITICAL,HIGH'
 
-    # - name: Gitleaks Secret Scan
-    #   uses: gitleaks/gitleaks-action@v2
-    #   env:
-    #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-     
-  #########################################################
-    # Sonarqube scan
-    #########################################################
+  #     - name: Docker Hub Login
+  #       uses: docker/login-action@v3
+  #       with:
+  #         username: ${{ secrets.DOCKERHUB_USERNAME }}
+  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    # - name: Sonarqube scan
-    #   uses: SonarSource/sonarqube-scan-action@v5
-    #   env:
-    #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-    #     SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-  
+  #     - name: Push Image to Docker Hub
+  #       run: |
+  #         docker push my-dockerhub-user/backend-app:${{ github.sha }}
+
+  # #########################################################
+  # # 8. Trigger GitOps Deployment (ArgoCD)
+  # #########################################################
+  # update-gitops:
+  #   name: "8. Update GitOps Repository"
+  #   runs-on: Agent-1
+  #   needs: container-security-and-push
+  #   steps:
+  #     - name: Checkout GitOps Repository / Update Manifests
+  #       run: |
+  #         echo "Updating Kubernetes deployment manifest with image tag: ${{ github.sha }}"
+  #         # Add git commit/push logic for your Kubernetes manifests repository here
 
 
 
