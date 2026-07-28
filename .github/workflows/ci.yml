@@ -15,7 +15,7 @@ on:
 jobs:
  security:
 
-    runs-on: self-hosted
+    runs-on: Agent-1
 
     steps:
 
