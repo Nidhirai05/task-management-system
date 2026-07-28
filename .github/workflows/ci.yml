@@ -74,27 +74,27 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
-  # #########################################################
-  # # 3. Filesystem Security Scan (Trivy)
-  # #########################################################
-  # trivy-fs:
-  #   name: "3. Trivy Filesystem Scan"
-  #   runs-on: Agent-1
-  #   needs: sonarqube
-  #   steps:
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@v4
+  #########################################################
+  # 3. Filesystem Security Scan (Trivy)
+  #########################################################
+  trivy-fs:
+    name: "3. Trivy Filesystem Scan"
+    runs-on: Agent-1
+    needs: sonarqube
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-  #     - name: Create Reports Directory
-  #       run: mkdir -p reports
+      - name: Create Reports Directory
+        run: mkdir -p reports
 
-  #     - name: Trivy FS Scan
-  #       uses: aquasecurity/trivy-action@master
-  #       with:
-  #         scan-type: 'fs'
-  #         scan-ref: '.'
-  #         format: 'table'
-  #         output: 'reports/trivy-fs-report.txt'
+      - name: Trivy FS Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          output: 'reports/trivy-fs-report.txt'
 
   # #########################################################
   # # 4. Software Composition Analysis (OWASP Dependency-Check)
