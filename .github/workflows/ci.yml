@@ -108,7 +108,7 @@ jobs:
   owasp-dependency-check:
     name: "4. OWASP Dependency-Check"
     runs-on: Agent-1
-    # needs: [gitleaks, sonarqube, trivy-fs]
+    needs: trivy-fs
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -152,7 +152,7 @@ jobs:
 
       - name: Install Syft & Generate Backend SBOM
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
           syft nidhirai1105/backend-app:${{ github.sha }} -o spdx-json=reports/backend-sbom.json
 
       # --- FRONTEND (Matched to your exact folder name) ---
