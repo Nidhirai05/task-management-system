@@ -80,7 +80,7 @@ jobs:
   trivy-fs:
     name: "3. Trivy Filesystem Scan"
     runs-on: Agent-1
-    needs: sonarqube
+    needs: gitleaks
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -95,28 +95,41 @@ jobs:
           scan-ref: '.'
           format: 'table'
           output: 'reports/trivy-fs-report.txt'
+          
+      - name: Upload Trivy FS Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-fs-report
+          path: 'reports/trivy-fs-report.txt'
+          retention-days: 30
+  #########################################################
+  # 4. Software Composition Analysis (OWASP Dependency-Check)
+  #########################################################
+  owasp-dependency-check:
+    name: "4. OWASP Dependency-Check"
+    runs-on: Agent-1
+    # needs: [gitleaks, sonarqube, trivy-fs]
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-  # #########################################################
-  # # 4. Software Composition Analysis (OWASP Dependency-Check)
-  # #########################################################
-  # owasp-dependency-check:
-  #   name: "4. OWASP Dependency-Check"
-  #   runs-on: Agent-1
-  #   needs: [gitleaks, sonarqube, trivy-fs]
-  #   steps:
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@v4
+      - name: Create Reports Directory
+        run: mkdir -p reports
 
-  #     - name: Create Reports Directory
-  #       run: mkdir -p reports
-
-  #     - name: OWASP Dependency Check Scan
-  #       uses: dependency-check/Dependency-Check_Action@main
-  #       with:
-  #         project: 'task-management-system'
-  #         path: '.'
-  #         format: 'HTML'
-  #         out: 'reports'
+      - name: OWASP Dependency Check Scan
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: 'task-management-system'
+          path: '.'
+          format: 'HTML'
+          out: 'reports'
+          
+      - name: Upload OWASP Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: owasp-dependency-check-report
+          path: reports/
+          retention-days: 30
 
   # #########################################################
   # # 5. Build Docker Images & Generate SBOM (Syft)
