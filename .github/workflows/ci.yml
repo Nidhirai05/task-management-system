@@ -131,59 +131,87 @@ jobs:
           path: reports/
           retention-days: 30
 
-  # #########################################################
-  # # 5. Build Docker Images & Generate SBOM (Syft)
-  # #########################################################
-  # build-and-sbom:
-  #   name: "5. Build Image & Generate SBOM"
-  #   runs-on: Agent-1
-  #   needs: owasp-dependency-check
-  #   steps:
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@v4
+#########################################################
+  # 5. Build Docker Images & Generate SBOM (Syft)
+  #########################################################
+  build-and-sbom:
+    name: "5. Build Images & Generate SBOM"
+    runs-on: Agent-1
+    needs: owasp-dependency-check
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-  #     - name: Build Backend Docker Image
-  #       run: |
-  #         docker build -t my-dockerhub-user/backend-app:${{ github.sha }} ./backend
+      - name: Create Reports Directory
+        run: mkdir -p reports
 
-  #     - name: Create Reports Directory
-  #       run: mkdir -p reports
+      # --- BACKEND ---
+      - name: Build Backend Docker Image
+        run: |
+          docker build -t nidhirai1105/backend-app:${{ github.sha }} ./backend
 
-  #     - name: Install Syft & Generate SBOM
-  #       run: |
-  #         curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
-  #         syft my-dockerhub-user/backend-app:${{ github.sha }} -o spdx-json=reports/sbom.json
+      - name: Install Syft & Generate Backend SBOM
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          syft nidhirai1105/backend-app:${{ github.sha }} -o spdx-json=reports/backend-sbom.json
 
-  #     - name: Upload SBOM Report Artifact
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: sbom-report
-  #         path: reports/sbom.json
+      # --- FRONTEND (Matched to your exact folder name) ---
+      - name: Build Frontend Docker Image
+        run: |
+          docker build -t nidhirai1105/frontend-app:${{ github.sha }} ./task-management-system-frontend
 
-  # #########################################################
-  # # 6. Container Security Scan & Docker Hub Push
-  # #########################################################
-  # container-security-and-push:
-  #   name: "6. Trivy Image Scan & Registry Push"
-  #   runs-on: Agent-1
-  #   needs: build-and-sbom
-  #   steps:
-  #     - name: Trivy Image Scan
-  #       uses: aquasecurity/trivy-action@master
-  #       with:
-  #         image-ref: 'my-dockerhub-user/backend-app:${{ github.sha }}'
-  #         format: 'table'
-  #         severity: 'CRITICAL,HIGH'
+      - name: Generate Frontend SBOM
+        run: |
+          syft nidhirai1105/frontend-app:${{ github.sha }} -o spdx-json=reports/frontend-sbom.json
 
-  #     - name: Docker Hub Login
-  #       uses: docker/login-action@v3
-  #       with:
-  #         username: ${{ secrets.DOCKERHUB_USERNAME }}
-  #         password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # --- UPLOAD REPORTS ---
+      - name: Upload SBOM Reports Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-reports
+          path: |
+            reports/backend-sbom.json
+            reports/frontend-sbom.json
+          retention-days: 30
 
-  #     - name: Push Image to Docker Hub
-  #       run: |
-  #         docker push my-dockerhub-user/backend-app:${{ github.sha }}
+  #########################################################
+  # 6. Container Security Scan & Docker Hub Push
+  #########################################################
+  container-security-and-push:
+    name: "6. Trivy Image Scan & Registry Push"
+    runs-on: Agent-1
+    needs: build-and-sbom
+    steps:
+      - name: Docker Hub Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # --- BACKEND TRIVY SCAN & PUSH ---
+      - name: Trivy Backend Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'nidhirai1105/backend-app:${{ github.sha }}'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Push Backend Image to Docker Hub
+        run: |
+          docker push nidhirai1105/backend-app:${{ github.sha }}
+
+      # --- FRONTEND TRIVY SCAN & PUSH ---
+      - name: Trivy Frontend Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'nidhirai1105/frontend-app:${{ github.sha }}'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Push Frontend Image to Docker Hub
+        run: |
+          docker push nidhirai1105/frontend-app:${{ github.sha }}
+
 
   # #########################################################
   # # 7. Trigger GitOps Deployment (ArgoCD)
