@@ -38,41 +38,41 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # #########################################################
-  # # 2. Code Quality & Deep SAST Analysis (SonarQube)
-  # #########################################################
-  # sonarqube:
-  #   name: "2. SonarQube SAST Scan"
-  #   runs-on: Agent-2
-  #   needs: gitleaks
-  #   steps:
-  #     - name: Checkout Repository
-  #       uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0 # Required for SonarQube git-blame analysis
+  #########################################################
+  # 2. Code Quality & Deep SAST Analysis (SonarQube)
+  #########################################################
+  sonarqube:
+    name: "2. SonarQube SAST Scan"
+    runs-on: Agent-2
+    needs: gitleaks
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for SonarQube git-blame analysis
 
-  #     # Set up Java 21 inside this job's isolated environment
-  #     - name: Set up JDK 21
-  #       uses: actions/setup-java@v4
-  #       with:
-  #         distribution: 'temurin'
-  #         java-version: '21'
-  #         cache: 'maven'
-  #         cache-dependency-path: 'backend/pom.xml'
+      # Set up Java 21 inside this job's isolated environment
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'maven'
+          cache-dependency-path: 'backend/pom.xml'
 
-  #     # Compile Spring Boot backend code to generate bytecode in target/classes
-  #     - name: Compile Backend Bytecode
-  #       run: |
-  #         cd backend
-  #         chmod +x mvnw
-  #         ./mvnw compile -DskipTests
+      # Compile Spring Boot backend code to generate bytecode in target/classes
+      - name: Compile Backend Bytecode
+        run: |
+          cd backend
+          chmod +x mvnw
+          ./mvnw compile -DskipTests
 
-  #     # Perform Deep Analysis with SonarQube Scan Action v6
-  #     - name: SonarQube Scan
-  #       uses: SonarSource/sonarqube-scan-action@v6
-  #       env:
-  #         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-  #         SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      # Perform Deep Analysis with SonarQube Scan Action v6
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
 
   #########################################################
   # 3. Filesystem Security Scan (Trivy)
@@ -80,7 +80,7 @@ jobs:
   trivy-fs:
     name: "3. Trivy Filesystem Scan"
     runs-on: Agent-2
-    needs: gitleaks
+    needs: sonarqube
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
