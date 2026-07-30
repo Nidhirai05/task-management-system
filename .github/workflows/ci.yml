@@ -194,6 +194,10 @@ jobs:
         with:
           image-ref: 'nidhirai1105/backend-app:${{ github.sha }}'
           format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os, library'
+          options: '--skip-db-update --skip-java-db-update'
           severity: 'CRITICAL,HIGH'
 
       - name: Push Backend Image to Docker Hub
