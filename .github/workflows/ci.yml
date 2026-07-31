@@ -90,11 +90,15 @@ jobs:
 
       - name: Trivy FS Scan
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_SKIP_DB_UPDATE: 'true'
+          TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'table'
           output: 'reports/trivy-fs-report.txt'
+          cache-dir: '/var/tmp/trivy-cache'
           
       - name: Upload Trivy FS Report
         uses: actions/upload-artifact@v4
@@ -191,14 +195,18 @@ jobs:
       # --- BACKEND TRIVY SCAN & PUSH ---
       - name: Trivy Backend Image Scan
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_SKIP_DB_UPDATE: 'true'
+          TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
         with:
+          scan-type: 'image'
           image-ref: 'nidhirai1105/backend-app:${{ github.sha }}'
           format: 'table'
           exit-code: '0'
           ignore-unfixed: true
-          vuln-type: 'os, library'
-          # options: '--skip-db-update --skip-java-db-update'
+          vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
+          cache-dir: '/var/tmp/trivy-cache'
 
       - name: Push Backend Image to Docker Hub
         run: |
@@ -207,10 +215,15 @@ jobs:
       # --- FRONTEND TRIVY SCAN & PUSH ---
       - name: Trivy Frontend Image Scan
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_SKIP_DB_UPDATE: 'true'
+          TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
         with:
+          scan-type: 'image'
           image-ref: 'nidhirai1105/frontend-app:${{ github.sha }}'
           format: 'table'
           severity: 'CRITICAL,HIGH'
+          cache-dir: '/var/tmp/trivy-cache'
 
       - name: Push Frontend Image to Docker Hub
         run: |
