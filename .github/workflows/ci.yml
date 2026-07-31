@@ -26,7 +26,7 @@ jobs:
   #########################################################
   gitleaks:
     name: "1. Gitleaks Secret Scan"
-    runs-on: Agent-2
+    runs-on: Agent-1
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
   #########################################################
   sonarqube:
     name: "2. SonarQube SAST Scan"
-    runs-on: Agent-2
+    runs-on: Agent-1
     needs: gitleaks
     steps:
       - name: Checkout Repository
@@ -79,7 +79,7 @@ jobs:
   #########################################################
   trivy-fs:
     name: "3. Trivy Filesystem Scan"
-    runs-on: Agent-2
+    runs-on: Agent-1
     needs: sonarqube
     steps:
       - name: Checkout Repository
@@ -90,15 +90,15 @@ jobs:
 
       - name: Trivy FS Scan
         uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_SKIP_DB_UPDATE: 'true'
-          TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
+        # env:
+        #   TRIVY_SKIP_DB_UPDATE: 'true'
+        #   TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
         with:
           scan-type: 'fs'
           scan-ref: '.'
           format: 'table'
           output: 'reports/trivy-fs-report.txt'
-          cache-dir: '/var/tmp/trivy-cache'
+          # cache-dir: '/var/tmp/trivy-cache'
           
       - name: Upload Trivy FS Report
         uses: actions/upload-artifact@v4
@@ -111,7 +111,7 @@ jobs:
   #########################################################
   owasp-dependency-check:
     name: "4. OWASP Dependency-Check"
-    runs-on: Agent-2
+    runs-on: Agent-1
     needs: trivy-fs
     steps:
       - name: Checkout Repository
@@ -195,9 +195,9 @@ jobs:
       # --- BACKEND TRIVY SCAN & PUSH ---
       - name: Trivy Backend Image Scan
         uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_SKIP_DB_UPDATE: 'true'
-          TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
+        # env:
+        #   TRIVY_SKIP_DB_UPDATE: 'true'
+        #   TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
         with:
           scan-type: 'image'
           image-ref: 'nidhirai1105/backend-app:${{ github.sha }}'
@@ -206,7 +206,7 @@ jobs:
           ignore-unfixed: true
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
-          cache-dir: '/var/tmp/trivy-cache'
+          # cache-dir: '/var/tmp/trivy-cache'
 
       - name: Push Backend Image to Docker Hub
         run: |
@@ -215,15 +215,15 @@ jobs:
       # --- FRONTEND TRIVY SCAN & PUSH ---
       - name: Trivy Frontend Image Scan
         uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_SKIP_DB_UPDATE: 'true'
-          TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
+        # env:
+        #   TRIVY_SKIP_DB_UPDATE: 'true'
+        #   TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
         with:
           scan-type: 'image'
           image-ref: 'nidhirai1105/frontend-app:${{ github.sha }}'
           format: 'table'
           severity: 'CRITICAL,HIGH'
-          cache-dir: '/var/tmp/trivy-cache'
+          # cache-dir: '/var/tmp/trivy-cache'
 
       - name: Push Frontend Image to Docker Hub
         run: |
