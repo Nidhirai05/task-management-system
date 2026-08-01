@@ -136,10 +136,10 @@ jobs:
           retention-days: 30
 
 #########################################################
-  # 5. Build Docker Images & Generate SBOM (Syft)
+  # 5. Build, Scan, and Push Docker Images
   #########################################################
-  build-and-sbom:
-    name: "5. Build Images & Generate SBOM"
+  build-scan-and-push:
+    name: "5. Build, Scan, & Push Images"
     runs-on: ubuntu-latest
     needs: owasp-dependency-check
     steps:
@@ -149,24 +149,54 @@ jobs:
       - name: Create Reports Directory
         run: mkdir -p reports
 
-      # --- BACKEND ---
+      - name: Docker Hub Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # --- BACKEND: BUILD, SBOM, SCAN, PUSH ---
       - name: Build Backend Docker Image
-        run: |
-          docker build -t nidhirai1105/backend-app:${{ github.sha }} ./backend
+        run: docker build -t nidhirai1105/backend-app:${{ github.sha }} ./backend
 
       - name: Install Syft & Generate Backend SBOM
         run: |
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
           syft nidhirai1105/backend-app:${{ github.sha }} -o spdx-json=reports/backend-sbom.json
 
-      # --- FRONTEND (Matched to your exact folder name) ---
+      - name: Trivy Backend Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: 'nidhirai1105/backend-app:${{ github.sha }}'
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Push Backend Image to Docker Hub
+        run: docker push nidhirai1105/backend-app:${{ github.sha }}
+
+
+      # --- FRONTEND: BUILD, SBOM, SCAN, PUSH ---
       - name: Build Frontend Docker Image
-        run: |
-          docker build -t nidhirai1105/frontend-app:${{ github.sha }} ./task-management-system-frontend
+        run: docker build -t nidhirai1105/frontend-app:${{ github.sha }} ./task-management-system-frontend
 
       - name: Generate Frontend SBOM
-        run: |
-          syft nidhirai1105/frontend-app:${{ github.sha }} -o spdx-json=reports/frontend-sbom.json
+        run: syft nidhirai1105/frontend-app:${{ github.sha }} -o spdx-json=reports/frontend-sbom.json
+
+      - name: Trivy Frontend Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'image'
+          image-ref: 'nidhirai1105/frontend-app:${{ github.sha }}'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Push Frontend Image to Docker Hub
+        run: docker push nidhirai1105/frontend-app:${{ github.sha }}
+
 
       # --- UPLOAD REPORTS ---
       - name: Upload SBOM Reports Artifact
@@ -177,57 +207,6 @@ jobs:
             reports/backend-sbom.json
             reports/frontend-sbom.json
           retention-days: 30
-
-  #########################################################
-  # 6. Container Security Scan & Docker Hub Push
-  #########################################################
-  container-security-and-push:
-    name: "6. Trivy Image Scan & Registry Push"
-    runs-on: ubuntu-latest
-    needs: build-and-sbom
-    steps:
-      - name: Docker Hub Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ vars.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # --- BACKEND TRIVY SCAN & PUSH ---
-      - name: Trivy Backend Image Scan
-        uses: aquasecurity/trivy-action@master
-        # env:
-        #   TRIVY_SKIP_DB_UPDATE: 'true'
-        #   TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
-        with:
-          scan-type: 'image'
-          image-ref: 'nidhirai1105/backend-app:${{ github.sha }}'
-          format: 'table'
-          exit-code: '0'
-          ignore-unfixed: true
-          vuln-type: 'os,library'
-          severity: 'CRITICAL,HIGH'
-          # cache-dir: '/var/tmp/trivy-cache'
-
-      - name: Push Backend Image to Docker Hub
-        run: |
-          docker push nidhirai1105/backend-app:${{ github.sha }}
-
-      # --- FRONTEND TRIVY SCAN & PUSH ---
-      - name: Trivy Frontend Image Scan
-        uses: aquasecurity/trivy-action@master
-        # env:
-        #   TRIVY_SKIP_DB_UPDATE: 'true'
-        #   TRIVY_SKIP_JAVA_DB_UPDATE: 'true'
-        with:
-          scan-type: 'image'
-          image-ref: 'nidhirai1105/frontend-app:${{ github.sha }}'
-          format: 'table'
-          severity: 'CRITICAL,HIGH'
-          # cache-dir: '/var/tmp/trivy-cache'
-
-      - name: Push Frontend Image to Docker Hub
-        run: |
-          docker push nidhirai1105/frontend-app:${{ github.sha }}
 
 
   # #########################################################
