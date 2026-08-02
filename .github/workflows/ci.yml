@@ -223,13 +223,14 @@ jobs:
           repository: 'Nidhirai05/Task-Manager-Gitops'
           token: ${{ secrets.GITOPS_ACCESS_TOKEN }}
           ref: 'main'
+          path: 'gitops-repo'
 
       - name: Update Manifests with New Image Tags
         run: |
           git config --global user.name "GitHub Actions Bot"
           git config --global user.email "actions@github.com"
 
-          cd $GITHUB_WORKSPACE
+          cd gitops-repo
           
           # Update Backend Tag
           sed -i 's|image: nidhirai1105/backend-app:.*|image: nidhirai1105/backend-app:${{ github.sha }}|g' k8s/backend-deployment.yaml
