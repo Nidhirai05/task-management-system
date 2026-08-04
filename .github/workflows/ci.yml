@@ -242,7 +242,7 @@ jobs:
           if git diff --quiet; then
             echo "No changes detected."
           else
-            git add k8s/backend-deployment.yaml k8s/frontend-deployment.yml
+            git add k8s/backend-deployment.yaml k8s/frontend-deployment.yaml
             git commit -m "chore(gitops): update image tags to ${{ github.sha }}"
             git push origin main
           fi
