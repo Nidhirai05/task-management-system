@@ -13,7 +13,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/user")
 @RequiredArgsConstructor
-@CrossOrigin(origins = "${app.cors.allowed-origins:http://localhost:5173}")
+// @CrossOrigin(origins = "${app.cors.allowed-origins:http://localhost:5173}")
 public class UserController {
 
     private final UserService userService;
